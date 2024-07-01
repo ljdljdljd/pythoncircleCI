@@ -1,0 +1,50 @@
+version: 2.1
+
+# 定义执行作业的环境
+executors:
+  windows-executor:
+    parameters:
+      image:
+        type: string
+        default: "CIRCLECI/windows-server-2019-vs2019:latest"
+    windows:
+      shell: powershell.exe
+      user: ContainerAdministrator
+
+# 定义工作流
+workflows:
+  build_and_test:
+    jobs:
+      - build_and_test
+
+# 工作流中的具体作业
+jobs:
+  build_and_test:
+    executor:
+      name: windows-executor
+      image: <<parameters.image>> # 使用默认的Windows Server 2019镜像
+    steps:
+      # 注意: 在Windows环境中安装Python和pip的命令会有所不同
+      - checkout # 检出代码
+      - run:
+          name: Install Python and pip
+          command: |
+            # 下载并安装Python
+            Invoke-WebRequest https://www.python.org/ftp/python/3.8.1/python-3.8.1-amd64.exe -OutFile python.exe
+            Start-Process .\python.exe -ArgumentList '/quiet InstallAllUsers=1 PrependPath=1' -Wait
+            Remove-Item python.exe
+            
+            # 将Python添加到PATH
+            $env:Path = "C:\Python38;" + $env:Path
+            [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Machine)
+            
+            # 验证Python和pip安装
+            python --version
+            pip --version
+            
+      - run:
+          name: Install dependencies
+          command: pip install -r requirements.txt
+      - run:
+          name: Run tests
+          command: python -m unittest discover -s tests/
